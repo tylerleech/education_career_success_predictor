@@ -1,35 +1,28 @@
 # src/__init__.py
 
-# Import functions from the data_loader module.
+# Data loading functions
 from .data_loader import load_data, inspect_data
 
-# Import functions from the preprocessing module.
-from .preprocessing import (
-    handle_missing_values,
-    encode_categorical,
-    scale_features,
-    remove_outliers
-)
+# Preprocessing functions
+from .preprocessing import handle_missing_values, encode_categorical, scale_features, remove_outliers
 
-# Import functions from the visualization module.
-from .visualization import (
-    plot_histogram,
-    plot_scatter,
-    plot_boxplot,
-    plot_bar_chart
-)
+# Visualization functions
+from .visualization import plot_histogram, plot_scatter, plot_boxplot, plot_bar_chart, plot_correlation_heatmap
 
-# Import functions from the models module.
+# Modeling functions
 from .models import (
     train_naive_bayes,
+    train_xgboost_classifier,
+    train_mlp_classifier,
+    tune_random_forest_classifier,
+    stacking_classifier,
     train_linear_regression,
-    train_random_forest_classifier,
-    train_svc_classifier,
-    train_random_forest_regressor,
-    train_svr
+    train_xgboost_regressor,
+    train_mlp_regressor,
+    tune_random_forest_regressor,
+    tune_svr,
+    stacking_regressor
 )
 
-# Import functions from the evaluation module.
+# Evaluation functions
 from .evaluation import evaluate_classification, evaluate_regression
-
-# You can add additional package-level initialization code here if needed.

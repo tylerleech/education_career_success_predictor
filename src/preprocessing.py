@@ -1,70 +1,144 @@
-# src/preprocessing.py
+# preprocessing.py
+
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+import numpy as np
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
 
-def handle_missing_values(df, strategy='drop'):
+def load_data(filepath: str) -> pd.DataFrame:
     """
-    Handle missing values in the DataFrame.
+    Load the dataset from a CSV file.
     
     Parameters:
-    - df (DataFrame): Input dataset.
-    - strategy (str): 'drop' to remove missing rows; 'fill' to impute missing numeric values
-                      using the column mean. (You can modify this to use 'median' if preferred.)
+        filepath (str): The path to the CSV file.
     
     Returns:
-    - df (DataFrame): Dataset with missing values handled.
+        pd.DataFrame: The loaded DataFrame.
     """
-    if strategy == 'drop':
-        df = df.dropna()
-    elif strategy == 'fill':
-        # Use mean imputation; you might change this to median imputation.
-        for col in df.select_dtypes(include=['float64','int64']).columns:
-            df[col] = df[col].fillna(df[col].mean())
-    return df
+    try:
+        df = pd.read_csv(filepath)
+        return df
+    except Exception as e:
+        raise FileNotFoundError(f"Could not load file from {filepath}: {e}")
 
-def encode_categorical(df):
+def remove_outliers(df: pd.DataFrame, columns: list, factor: float = 1.5) -> pd.DataFrame:
     """
-    Convert categorical columns into dummy/indicator variables.
+    Remove outliers from the specified numeric columns using the IQR method.
     
     Parameters:
-    - df (DataFrame): Dataset with categorical columns.
+        df (pd.DataFrame): The input DataFrame.
+        columns (list): List of numeric column names.
+        factor (float): The multiplier for the IQR (default is 1.5).
     
     Returns:
-    - df_encoded (DataFrame): Dataset with one-hot encoded variables.
+        pd.DataFrame: A DataFrame with outliers removed.
     """
-    categorical_features = df.select_dtypes(include=['object']).columns
-    df_encoded = pd.get_dummies(df, columns=categorical_features, drop_first=True)
-    return df_encoded
+    df_clean = df.copy()
+    for col in columns:
+        # Only apply on numeric columns
+        if pd.api.types.is_numeric_dtype(df_clean[col]):
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
 
-def scale_features(df, numerical_columns):
+def build_preprocessor(df: pd.DataFrame, target_column: str, remove_outlier_flag: bool = True) -> ColumnTransformer:
     """
-    Scale numerical features using StandardScaler.
+    Build and return a ColumnTransformer that preprocesses numeric and categorical features.
     
     Parameters:
-    - df (DataFrame): Input dataset.
-    - numerical_columns (list): List of numerical column names to scale.
+        df (pd.DataFrame): The input DataFrame.
+        target_column (str): The name of the target column.
+        remove_outlier_flag (bool): Whether to remove outliers on numeric data.
     
     Returns:
-    - df (DataFrame): Dataset with scaled numerical columns.
+        ColumnTransformer: A transformer that can be used to fit/transform features.
     """
-    scaler = StandardScaler()  # You could swap in RobustScaler if outliers remain problematic
-    df[numerical_columns] = scaler.fit_transform(df[numerical_columns])
-    return df
+    # Separate features and drop the target column
+    X = df.drop(columns=[target_column])
+    
+    # Identify numeric and categorical features
+    numeric_features = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    # Optionally remove outliers based on numeric features
+    if remove_outlier_flag:
+        df = remove_outliers(df, numeric_features)
+        X = df.drop(columns=[target_column])
+        numeric_features = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
+        categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
+    
+    # Create a numeric data pipeline: impute missing values and scale features
+    numeric_pipeline = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler())
+    ])
+    
+    # Create a categorical data pipeline: impute missing values and one-hot encode
+    categorical_pipeline = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
+        ('encoder', OneHotEncoder(handle_unknown='ignore'))
+    ])
+    
+    # Combine both pipelines into a single preprocessor
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_pipeline, numeric_features),
+            ('cat', categorical_pipeline, categorical_features)
+        ]
+    )
+    
+    return preprocessor
 
-def remove_outliers(df, column, factor=1.5):
+def preprocess_data(df: pd.DataFrame, target_column: str, remove_outlier_flag: bool = True):
     """
-    Remove outliers from a specified column using the IQR method.
+    Preprocess the features and target data.
+    
+    This function builds the preprocessor, optionally removes outliers, and fits and transforms the features.
     
     Parameters:
-    - df (DataFrame): Input dataset.
-    - column (str): Column from which to remove outliers.
-    - factor (float): Multiplier for the IQR; default 1.5.
+        df (pd.DataFrame): The raw DataFrame.
+        target_column (str): The target variable column.
+        remove_outlier_flag (bool): Flag to remove outliers (default True).
     
     Returns:
-    - df (DataFrame): DataFrame with outliers removed for that column.
+        X_transformed: The transformed features (sparse matrix or numpy array).
+        y: The target variable.
+        preprocessor: The fitted ColumnTransformer.
     """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    df = df[(df[column] >= Q1 - factor * IQR) & (df[column] <= Q3 + factor * IQR)]
-    return df
+    # If outlier removal is enabled, remove them first
+    if remove_outlier_flag:
+        numeric_cols = df.drop(columns=[target_column]).select_dtypes(include=['int64', 'float64']).columns.tolist()
+        df = remove_outliers(df, numeric_cols)
+    
+    # Extract features and target
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
+    
+    # Build and fit the preprocessor on the feature data
+    preprocessor = build_preprocessor(df, target_column, remove_outlier_flag)
+    X_transformed = preprocessor.fit_transform(X)
+    
+    return X_transformed, y, preprocessor
+
+# Example usage (this block can be called from your main script)
+if __name__ == '__main__':
+    # Update the file path and target column name according to your dataset
+    file_path = '/mnt/data/education_career_success.csv'
+    
+    # IMPORTANT: Replace 'CareerSuccess' with the actual target column in your dataset.
+    target_column = 'CareerSuccess'  
+    
+    # Load the data
+    df = load_data(file_path)
+    print("Dataset columns:", df.columns.tolist())
+    
+    # Preprocess data
+    X_transformed, y, preprocessor = preprocess_data(df, target_column)
+    print("Preprocessed feature shape:", X_transformed.shape)
+    print("Target shape:", y.shape)
