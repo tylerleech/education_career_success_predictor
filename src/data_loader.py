@@ -1,14 +1,14 @@
+# src/data_loader.py
 import pandas as pd
 
 def load_data(file_path):
-    """
-    Load the dataset from a CSV file.
-    
-    Args:
-    file_path (str): The path to the CSV file.
-    
-    Returns:
-    pandas.DataFrame: The loaded dataset.
-    """
     df = pd.read_csv(file_path)
     return df
+
+def inspect_data(df):
+    print("Head of dataset:")
+    print(df.head())
+    print("\nDataset Info:")
+    print(df.info())
+    print("\nDescriptive Statistics:")
+    print(df.describe())
