@@ -4,13 +4,17 @@
 from .data_loader import load_data, inspect_data
 
 # Preprocessing functions
-from .preprocessing import handle_missing_values, encode_categorical, scale_features, remove_outliers
+# src/__init__.py (updated version)
+from .preprocessing import load_data, build_preprocessor, remove_outliers
+
 
 # Visualization functions
 from .visualization import plot_histogram, plot_scatter, plot_boxplot, plot_bar_chart, plot_correlation_heatmap
 
 # Modeling functions
 from .models import (
+ 
+
     train_naive_bayes,
     train_xgboost_classifier,
     train_mlp_classifier,

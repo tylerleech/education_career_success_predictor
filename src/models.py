@@ -1,156 +1,60 @@
 # src/models.py
 
-# Import necessary models and tools from scikit-learn
-from sklearn.naive_bayes import GaussianNB
-from sklearn.linear_model import LinearRegression, RidgeClassifier
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, StackingClassifier, StackingRegressor
-from sklearn.svm import SVR, SVC
-from sklearn.neural_network import MLPRegressor, MLPClassifier
-from sklearn.model_selection import GridSearchCV
-
-# Import XGBoost (make sure to install with: pip install xgboost)
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestRegressor, StackingRegressor
+from sklearn.linear_model import Ridge
 import xgboost as xgb
 
-#############################
-# Classification Models
-#############################
-def train_naive_bayes(X_train, y_train):
+def prepare_data(filepath: str, target_column: str, outlier_flag: bool = True):
     """
-    Train a Gaussian Naive Bayes classifier.
+    Load the dataset, optionally remove outliers, then split into training and testing sets.
     """
-    model = GaussianNB()
-    model.fit(X_train, y_train)
-    return model
+    # Import helper functions from preprocessing
+    from src.preprocessing import load_data, remove_outliers
 
-def train_xgboost_classifier(X_train, y_train):
-    """
-    Train an XGBoost classifier.
-    """
-    # Set some default parameters; these can be tuned later.
-    model = xgb.XGBClassifier(objective='binary:logistic',
-                              eval_metric='logloss',
-                              use_label_encoder=False,
-                              random_state=42)
-    model.fit(X_train, y_train)
-    return model
-
-def train_mlp_classifier(X_train, y_train):
-    """
-    Train a Multi-Layer Perceptron classifier.
-    """
-    model = MLPClassifier(hidden_layer_sizes=(100,),
-                          max_iter=300,
-                          random_state=42)
-    model.fit(X_train, y_train)
-    return model
-
-def tune_random_forest_classifier(X_train, y_train):
-    """
-    Tune a Random Forest classifier using GridSearchCV.
+    # Load the dataset from CSV
+    df = load_data(filepath)
     
-    Returns the best estimator based on cross-validation.
-    """
-    param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [None, 10, 20],
-        'min_samples_split': [2, 5, 10]
-    }
-    grid = GridSearchCV(RandomForestClassifier(random_state=42),
-                        param_grid,
-                        cv=5,
-                        n_jobs=-1)
-    grid.fit(X_train, y_train)
-    print("Best parameters (Classifier):", grid.best_params_)
-    return grid.best_estimator_
+    # Identify numeric columns (excluding the target)
+    numeric_cols = df.drop(columns=[target_column]).select_dtypes(include=['int64', 'float64']).columns.tolist()
+    
+    # Optionally remove outliers for numeric features
+    if outlier_flag:
+        df = remove_outliers(df, numeric_cols)
+    
+    # Separate features and target
+    X = df.drop(columns=[target_column])
+    y = df[target_column]
+    
+    # Perform a train/test split
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    return X_train, X_test, y_train, y_test
 
-def stacking_classifier(X_train, y_train):
+def build_stacked_model(preprocessor):
     """
-    Create a stacked classifier that combines predictions from multiple models.
+    Build a pipeline with the given preprocessor and a stacked regressor
+    that combines a RandomForest and an XGBoost model, with Ridge as the final estimator.
     """
+    # Define base estimators for stacking
     estimators = [
-        ('rf', RandomForestClassifier(n_estimators=100, random_state=42)),
-        ('svc', SVC(probability=True, random_state=42)),
-        ('mlp', MLPClassifier(max_iter=300, random_state=42))
+        ('rf', RandomForestRegressor(random_state=42)),
+        ('xgb', xgb.XGBRegressor(random_state=42, objective='reg:squarederror'))
     ]
-    # Use RidgeClassifier as the final estimator for stacking.
-    model = StackingClassifier(estimators=estimators, final_estimator=RidgeClassifier())
-    model.fit(X_train, y_train)
-    return model
-
-#############################
-# Regression Models
-#############################
-def train_linear_regression(X_train, y_train):
-    """
-    Train a Linear Regression model.
-    """
-    model = LinearRegression()
-    model.fit(X_train, y_train)
-    return model
-
-def train_xgboost_regressor(X_train, y_train):
-    """
-    Train an XGBoost regressor.
-    """
-    model = xgb.XGBRegressor(objective='reg:squarederror', random_state=42)
-    model.fit(X_train, y_train)
-    return model
-
-def train_mlp_regressor(X_train, y_train):
-    """
-    Train a Multi-Layer Perceptron regressor.
-    """
-    model = MLPRegressor(hidden_layer_sizes=(100,),
-                         max_iter=300,
-                         random_state=42)
-    model.fit(X_train, y_train)
-    return model
-
-def tune_random_forest_regressor(X_train, y_train):
-    """
-    Tune a Random Forest regressor using GridSearchCV.
     
-    Returns the best estimator.
-    """
-    param_grid = {
-        'n_estimators': [50, 100, 200],
-        'max_depth': [None, 10, 20],
-        'min_samples_split': [2, 5, 10]
-    }
-    grid = GridSearchCV(RandomForestRegressor(random_state=42),
-                        param_grid,
-                        cv=5,
-                        n_jobs=-1)
-    grid.fit(X_train, y_train)
-    print("Best parameters (Regressor):", grid.best_params_)
-    return grid.best_estimator_
-
-def tune_svr(X_train, y_train):
-    """
-    Tune a Support Vector Regressor using GridSearchCV.
+    # Create the stacked regressor with a Ridge regressor as the final estimator
+    stacked_regressor = StackingRegressor(
+        estimators=estimators,
+        final_estimator=Ridge(),
+        cv=5,
+        n_jobs=-1
+    )
     
-    Returns the best estimator.
-    """
-    param_grid = {
-        'C': [0.1, 1, 10],
-        'epsilon': [0.01, 0.1, 1],
-        'kernel': ['linear', 'rbf']
-    }
-    grid = GridSearchCV(SVR(), param_grid, cv=5, n_jobs=-1)
-    grid.fit(X_train, y_train)
-    print("Best parameters (SVR):", grid.best_params_)
-    return grid.best_estimator_
-
-def stacking_regressor(X_train, y_train):
-    """
-    Create a stacked regressor that blends predictions from multiple base models.
-    """
-    estimators = [
-        ('lr', LinearRegression()),
-        ('rf', RandomForestRegressor(n_estimators=100, random_state=42)),
-        ('svr', SVR())
-    ]
-    model = StackingRegressor(estimators=estimators,
-                              final_estimator=MLPRegressor(random_state=42))
-    model.fit(X_train, y_train)
-    return model
+    # Build the complete pipeline by chaining the preprocessor and the stacked regressor
+    model_pipeline = Pipeline(steps=[
+        ('preprocessor', preprocessor),
+        ('stacked_model', stacked_regressor)
+    ])
+    
+    return model_pipeline
