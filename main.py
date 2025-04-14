@@ -13,21 +13,21 @@ def train_and_evaluate(data_path: str, target_column: str, remove_outliers_flag:
     Loads data, builds a pipeline with preprocessing and a stacked regressor,
     trains the model, and prints evaluation metrics.
     """
-    # Prepare the data (load CSV, optionally remove outliers, and split into train/test sets)
+    # Prepare the data: load CSV, optionally remove outliers, and perform a train/test split.
     X_train, X_test, y_train, y_test = prepare_data(data_path, target_column, outlier_flag=remove_outliers_flag)
     
-    # Build preprocessor using the training data (attach target column temporarily)
+    # Build the preprocessor from training data. We add the target column temporarily to fit the transformer.
     train_df = X_train.copy()
     train_df[target_column] = y_train
     preprocessor = build_preprocessor(train_df, target_column, remove_outlier_flag=False)
     
-    # Build the stacked model pipeline
+    # Build the stacked model pipeline.
     model_pipeline = build_stacked_model(preprocessor)
     
-    # Train the pipeline
+    # Train the pipeline.
     model_pipeline.fit(X_train, y_train)
     
-    # Generate predictions and evaluate the model
+    # Generate predictions and evaluate.
     predictions = model_pipeline.predict(X_test)
     rmse = np.sqrt(mean_squared_error(y_test, predictions))
     r2 = r2_score(y_test, predictions)

@@ -33,40 +33,41 @@ def remove_outliers(df: pd.DataFrame, columns: list, factor: float = 1.5) -> pd.
 
 def build_preprocessor(df: pd.DataFrame, target_column: str, remove_outlier_flag: bool = True):
     """
-    Build a ColumnTransformer for preprocessing:
-      - Impute and scale numeric features.
-      - Impute and one-hot encode categorical features.
+    Build a ColumnTransformer that preprocesses numeric and categorical features:
+      - Numeric features are imputed (with median) and scaled.
+      - Categorical features are imputed (using a constant) and one-hot encoded.
     """
-    # Remove the target column from the features
+    # Drop the target column.
     X = df.drop(columns=[target_column])
     
-    # Identify numeric and categorical columns
+    # Identify numeric and categorical features.
     numeric_features = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
     categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
     
-    # Optionally remove outliers (re-compute features after outlier removal)
+    # Optionally remove outliers.
     if remove_outlier_flag:
         df = remove_outliers(df, numeric_features)
         X = df.drop(columns=[target_column])
         numeric_features = X.select_dtypes(include=['int64', 'float64']).columns.tolist()
         categorical_features = X.select_dtypes(include=['object', 'category']).columns.tolist()
     
-    # Pipeline for numeric data: impute missing values and scale the features
+    # Create a pipeline for numeric features.
     numeric_pipeline = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='median')),
         ('scaler', StandardScaler())
     ])
     
-    # Pipeline for categorical data: impute missing values and apply one-hot encoding
+    # Create a pipeline for categorical features.
     categorical_pipeline = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='constant', fill_value='missing')),
         ('encoder', OneHotEncoder(handle_unknown='ignore'))
     ])
     
-    # Combine the numeric and categorical pipelines
+    # Combine both pipelines into a ColumnTransformer.
     preprocessor = ColumnTransformer(transformers=[
         ('num', numeric_pipeline, numeric_features),
         ('cat', categorical_pipeline, categorical_features)
     ])
     
     return preprocessor
+

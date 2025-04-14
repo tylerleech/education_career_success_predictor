@@ -1,32 +1,4 @@
 # src/__init__.py
 
-# Data loading functions
-from .data_loader import load_data, inspect_data
-
-# Preprocessing functions
-# src/__init__.py (updated version)
-from .preprocessing import load_data, build_preprocessor, remove_outliers
-
-
-# Visualization functions
-from .visualization import plot_histogram, plot_scatter, plot_boxplot, plot_bar_chart, plot_correlation_heatmap
-
-# Modeling functions
-from .models import (
- 
-
-    train_naive_bayes,
-    train_xgboost_classifier,
-    train_mlp_classifier,
-    tune_random_forest_classifier,
-    stacking_classifier,
-    train_linear_regression,
-    train_xgboost_regressor,
-    train_mlp_regressor,
-    tune_random_forest_regressor,
-    tune_svr,
-    stacking_regressor
-)
-
-# Evaluation functions
-from .evaluation import evaluate_classification, evaluate_regression
+from .preprocessing import load_data, remove_outliers, build_preprocessor
+from .models import build_stacked_model, prepare_data
