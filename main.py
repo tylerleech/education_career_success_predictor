@@ -9,33 +9,37 @@ def main():
     # ---------------------------
     data_path = os.path.join('data', 'education_career_success.csv')
     df = data_loader.load_data(data_path)
-    data_loader.inspect_data(df)
     
-    # Drop the identifier column if present
+    # Initial inspection and validation of the raw data
+    print("=== Initial Data Inspection ===")
+    preprocessing.inspect_data(df)
+    print("=== Data Validation ===")
+    preprocessing.validate_data(df)
+    
+    # Drop any identifier columns that are not informative
     if 'Student_ID' in df.columns:
         df.drop(columns=['Student_ID'], inplace=True)
     
     # ---------------------------
     # 2. Exploratory Data Analysis (EDA)
     # ---------------------------
-    # Plot a correlation heatmap for numerical features.
     visualization.plot_correlation_heatmap(df)
-    
-    # You might also want to visualize missing values or distributions of key features
-    # (This example uses the histogram of Age and boxplot of Starting_Salary)
     visualization.plot_histogram(df, 'Age')
     visualization.plot_boxplot(df, 'Starting_Salary')
     
     # ---------------------------
     # 3. Preprocess the Data
     # ---------------------------
-    # Handle missing values using either drop or fill strategy.
-    df_clean = preprocessing.handle_missing_values(df, strategy='drop')
+    # Handle missing values using a robust filling strategy
+    df_clean = preprocessing.handle_missing_values(df, strategy='fill')
     
-    # Encode categorical variables (e.g., Gender, Field_of_Study, Current_Job_Level, Entrepreneurship)
+    # Remove outliers from key columns (e.g., the regression target)
+    df_clean = preprocessing.remove_outliers(df_clean, column='Starting_Salary')
+    
+    # Encode categorical variables into numerical representations
     df_encoded = preprocessing.encode_categorical(df_clean)
     
-    # Define numerical columns based on your dataset.
+    # Define numerical columns based on your dataset's features
     numerical_columns = [
         'Age', 'High_School_GPA', 'SAT_Score', 'University_Ranking',
         'University_GPA', 'Internships_Completed', 'Projects_Completed',
@@ -44,36 +48,14 @@ def main():
         'Years_to_Promotion', 'Work_Life_Balance'
     ]
     
-    # Scale the numerical features.
-    df_encoded = preprocessing.scale_features(df_encoded, numerical_columns)
-    
-    # Remove outliers for the regression target (Starting_Salary).
-    df_encoded = preprocessing.remove_outliers(df_encoded, column='Starting_Salary')
+    # Scale numerical features using a robust scaler to lessen the impact of outliers
+    df_encoded = preprocessing.scale_features(df_encoded, numerical_columns, scaler_type='robust')
     
     # ---------------------------
     # 4. Model Training and Evaluation
     # ---------------------------
-    # (A) Classification Task: Predicting Entrepreneurship (assumes binary outcome)
-    if 'Entrepreneurship' in df_encoded.columns:
-        X_class = df_encoded.drop('Entrepreneurship', axis=1)
-        y_class = df_encoded['Entrepreneurship']
-        X_train_class, X_test_class, y_train_class, y_test_class = train_test_split(
-            X_class, y_class, test_size=0.3, random_state=42
-        )
-        
-        # Baseline Model: Naive Bayes
-        nb_model = models.train_naive_bayes(X_train_class, y_train_class)
-        y_pred_nb = nb_model.predict(X_test_class)
-        print("\n--- Naive Bayes Classification Evaluation ---")
-        evaluation.evaluate_classification(y_test_class, y_pred_nb)
-        
-        # Optimized Model: Tune Random Forest Classifier
-        tuned_rf_classifier = models.tune_random_forest_classifier(X_train_class, y_train_class)
-        y_pred_rf = tuned_rf_classifier.predict(X_test_class)
-        print("\n--- Tuned Random Forest Classifier Evaluation ---")
-        evaluation.evaluate_classification(y_test_class, y_pred_rf)
     
-    # (B) Regression Task: Predicting Starting_Salary
+    # (A) Regression Task: Predicting Starting_Salary
     if 'Starting_Salary' in df_encoded.columns:
         X_reg = df_encoded.drop('Starting_Salary', axis=1)
         y_reg = df_encoded['Starting_Salary']
@@ -81,34 +63,36 @@ def main():
             X_reg, y_reg, test_size=0.3, random_state=42
         )
         
-        # Baseline Model: Linear Regression
-        linreg_model = models.train_linear_regression(X_train_reg, y_train_reg)
-        y_pred_lr = linreg_model.predict(X_test_reg)
-        print("\n--- Linear Regression Evaluation ---")
-        rmse_lr, r2_lr = evaluation.evaluate_regression(y_test_reg, y_pred_lr)
+        # Train the stacking regressor ensemble
+        stacking_regressor_model = models.stacking_regressor(X_train_reg, y_train_reg)
+        y_pred_stack = stacking_regressor_model.predict(X_test_reg)
+        print("\n--- Stacking Regressor Evaluation ---")
+        rmse_stack, r2_stack = evaluation.evaluate_regression(y_test_reg, y_pred_stack)
+    
+    # (B) Classification Task: Predicting Entrepreneurship (if this column exists)
+    if 'Entrepreneurship' in df_encoded.columns:
+        X_class = df_encoded.drop('Entrepreneurship', axis=1)
+        y_class = df_encoded['Entrepreneurship']
+        X_train_class, X_test_class, y_train_class, y_test_class = train_test_split(
+            X_class, y_class, test_size=0.3, random_state=42
+        )
         
-        # Optimized Model: Tune Random Forest Regressor
-        tuned_rf_regressor = models.tune_random_forest_regressor(X_train_reg, y_train_reg)
-        y_pred_rf_reg = tuned_rf_regressor.predict(X_test_reg)
-        print("\n--- Tuned Random Forest Regressor Evaluation ---")
-        rmse_rf, r2_rf = evaluation.evaluate_regression(y_test_reg, y_pred_rf_reg)
-        
-        # Additional Optimized Model: Tune SVR
-        tuned_svr = models.tune_svr(X_train_reg, y_train_reg)
-        y_pred_svr = tuned_svr.predict(X_test_reg)
-        print("\n--- Tuned SVR Evaluation ---")
-        rmse_svr, r2_svr = evaluation.evaluate_regression(y_test_reg, y_pred_svr)
+        # Train the stacking classifier ensemble
+        stacking_classifier_model = models.stacking_classifier(X_train_class, y_train_class)
+        y_pred_class = stacking_classifier_model.predict(X_test_class)
+        print("\n--- Stacking Classifier Evaluation ---")
+        evaluation.evaluate_classification(y_test_class, y_pred_class)
     
     # ---------------------------
-    # 5. Model Comparison Visualization
+    # 5. Model Performance Summary (Optional Visualization)
     # ---------------------------
-    # Compare regression models if the evaluations were computed.
     try:
-        models_names = ['Linear Regression', 'Tuned RF', 'Tuned SVR']
-        rmse_values = [rmse_lr, rmse_rf, rmse_svr]
-        visualization.plot_bar_chart(models_names, rmse_values)
+        print("\nStacking Regressor Performance:")
+        print(f"RMSE: {rmse_stack:.4f}")
+        print(f"R²: {r2_stack:.4f}")
     except NameError:
-        print("Some regression models were not evaluated; please check your regression pipeline.")
+        print("Regression performance metrics are not available. Check your regression pipeline.")
 
 if __name__ == "__main__":
     main()
+

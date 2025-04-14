@@ -34,7 +34,6 @@ def train_random_forest_classifier(X_train, y_train):
 def tune_random_forest_classifier(X_train, y_train):
     """
     Tune a Random Forest classifier using GridSearchCV.
-    
     Returns the best estimator after hyperparameter search.
     """
     param_grid = {
@@ -66,7 +65,6 @@ def train_random_forest_regressor(X_train, y_train):
 def tune_random_forest_regressor(X_train, y_train):
     """
     Tune a Random Forest regressor using GridSearchCV.
-    
     Returns the best estimator.
     """
     param_grid = {
@@ -90,7 +88,6 @@ def train_svr(X_train, y_train):
 def tune_svr(X_train, y_train):
     """
     Tune a Support Vector Regressor using GridSearchCV.
-    
     Returns the best estimator.
     """
     param_grid = {
@@ -106,18 +103,13 @@ def tune_svr(X_train, y_train):
 def train_xgboost_classifier(X_train, y_train, params=None):
     """
     Train an XGBoost classifier on the provided data.
-
     Parameters:
-        X_train : array-like
-            Training features.
-        y_train : array-like
-            Training labels.
+        X_train : array-like, training features.
+        y_train : array-like, training labels.
         params : dict, optional
             Parameters for XGBClassifier. If None, default parameters are used.
-
     Returns:
-        model : XGBClassifier
-            The trained XGBoost classifier.
+        model : XGBClassifier, the trained classifier.
     """
     if params is None:
         params = {}
@@ -128,21 +120,109 @@ def train_xgboost_classifier(X_train, y_train, params=None):
 def train_xgboost_regressor(X_train, y_train, params=None):
     """
     Train an XGBoost regressor on the provided data.
-
     Parameters:
-        X_train : array-like
-            Training features.
-        y_train : array-like
-            Training targets.
+        X_train : array-like, training features.
+        y_train : array-like, training targets.
         params : dict, optional
             Parameters for XGBRegressor. If None, default parameters are used.
-
     Returns:
-        model : XGBRegressor
-            The trained XGBoost regressor.
+        model : XGBRegressor, the trained regressor.
     """
     if params is None:
         params = {}
     model = XGBRegressor(**params)
+    model.fit(X_train, y_train)
+    return model
+
+# --------------------------------------------------------------------
+# Sophisticated Ensemble Methods: Stacking Ensembles
+# --------------------------------------------------------------------
+
+def stacking_classifier(X_train, y_train):
+    """
+    Train a stacking classifier ensemble using multiple base classifiers and a meta-classifier.
+    
+    Base models used:
+      - RandomForestClassifier
+      - XGBClassifier
+      - GaussianNB
+    Meta-model used:
+      - LogisticRegression
+    
+    Parameters:
+      X_train : array-like
+          Training features.
+      y_train : array-like
+          Training labels.
+    
+    Returns:
+      model : StackingClassifier
+          The trained stacking classifier model.
+    """
+    from sklearn.ensemble import StackingClassifier
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.ensemble import RandomForestClassifier
+    from xgboost import XGBClassifier
+    from sklearn.naive_bayes import GaussianNB
+
+    estimators = [
+        ('rf', RandomForestClassifier(random_state=42)),
+        ('xgb', XGBClassifier(use_label_encoder=False, eval_metric='logloss', random_state=42)),
+        ('nb', GaussianNB())
+    ]
+    
+    meta_estimator = LogisticRegression()
+    
+    model = StackingClassifier(
+        estimators=estimators,
+        final_estimator=meta_estimator,
+        cv=5,
+        n_jobs=-1
+    )
+    
+    model.fit(X_train, y_train)
+    return model
+
+def stacking_regressor(X_train, y_train):
+    """
+    Train a stacking regressor ensemble using multiple base regressors and a meta-regressor.
+    
+    Base models used:
+      - RandomForestRegressor
+      - XGBRegressor
+      - LinearRegression
+    Meta-model used:
+      - Ridge Regression
+    
+    Parameters:
+      X_train : array-like
+          Training features.
+      y_train : array-like
+          Training targets.
+    
+    Returns:
+      model : StackingRegressor
+          The trained stacking regressor model.
+    """
+    from sklearn.ensemble import StackingRegressor
+    from sklearn.ensemble import RandomForestRegressor
+    from xgboost import XGBRegressor
+    from sklearn.linear_model import LinearRegression, Ridge
+
+    estimators = [
+        ('rf', RandomForestRegressor(random_state=42)),
+        ('xgb', XGBRegressor(random_state=42)),
+        ('lr', LinearRegression())
+    ]
+    
+    meta_estimator = Ridge()
+    
+    model = StackingRegressor(
+        estimators=estimators,
+        final_estimator=meta_estimator,
+        cv=5,
+        n_jobs=-1
+    )
+    
     model.fit(X_train, y_train)
     return model
