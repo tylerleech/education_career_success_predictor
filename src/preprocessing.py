@@ -12,29 +12,39 @@ def inspect_data(df):
       - Data info and descriptive statistics
       - Missing values count per column
       - Skewness of numeric features
-      - Correlation matrix
+      - Correlation matrix (computed only on numeric columns)
     Also displays histograms for numeric columns.
     """
+    import matplotlib.pyplot as plt
+    import seaborn as sns
     print("===== Data Information =====")
     print(df.info())
+    
     print("\n===== Descriptive Statistics =====")
+    # The describe() without parameters excludes non-numeric columns.
     print(df.describe())
+    
     print("\n===== Missing Values =====")
     print(df.isnull().sum())
+    
     print("\n===== Skewness of Numeric Features =====")
-    print(df.select_dtypes(include=[np.number]).skew())
+    numeric_df = df.select_dtypes(include=[np.number])
+    print(numeric_df.skew())
+    
     print("\n===== Correlation Matrix =====")
-    print(df.corr())
+    # Compute correlation only on the numeric subset.
+    print(numeric_df.corr())
     
     # Plot histograms for numeric features
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    numeric_cols = numeric_df.columns
     for col in numeric_cols:
         plt.figure(figsize=(6, 4))
-        sns.histplot(df[col].dropna(), kde=True)
+        sns.histplot(numeric_df[col].dropna(), kde=True)
         plt.title(f"Distribution of {col}")
         plt.xlabel(col)
         plt.ylabel("Frequency")
         plt.show()
+
 
 def validate_data(df):
     """

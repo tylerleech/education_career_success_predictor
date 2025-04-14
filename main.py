@@ -10,15 +10,15 @@ def main():
     data_path = os.path.join('data', 'education_career_success.csv')
     df = data_loader.load_data(data_path)
     
-    # Initial inspection and validation of the raw data
-    print("=== Initial Data Inspection ===")
-    preprocessing.inspect_data(df)
-    print("=== Data Validation ===")
-    preprocessing.validate_data(df)
-    
-    # Drop any identifier columns that are not informative
+    # Drop identifier columns (e.g., Student_ID) before inspection to avoid issues with non-numeric data
     if 'Student_ID' in df.columns:
         df.drop(columns=['Student_ID'], inplace=True)
+    
+    print("=== Initial Data Inspection ===")
+    preprocessing.inspect_data(df)
+    
+    print("=== Data Validation ===")
+    preprocessing.validate_data(df)
     
     # ---------------------------
     # 2. Exploratory Data Analysis (EDA)
@@ -95,4 +95,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
