@@ -1,60 +1,148 @@
 # src/models.py
 
-import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.pipeline import Pipeline
-from sklearn.ensemble import RandomForestRegressor, StackingRegressor
-from sklearn.linear_model import Ridge
-import xgboost as xgb
+from sklearn.naive_bayes import GaussianNB
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.svm import SVC, SVR
+from sklearn.model_selection import GridSearchCV
+from xgboost import XGBClassifier, XGBRegressor
 
-def prepare_data(filepath: str, target_column: str, outlier_flag: bool = True):
+def train_naive_bayes(X_train, y_train):
     """
-    Load the dataset, optionally remove outliers, and then split into training and testing sets.
+    Train a Gaussian Naive Bayes classifier.
     """
-    # Import helper functions from preprocessing.
-    from src.preprocessing import load_data, remove_outliers
+    model = GaussianNB()
+    model.fit(X_train, y_train)
+    return model
 
-    # Load the data.
-    df = load_data(filepath)
-    
-    # Identify numeric columns (excluding the target)
-    numeric_cols = df.drop(columns=[target_column]).select_dtypes(include=['int64', 'float64']).columns.tolist()
-    
-    # Optionally remove outliers from numeric features.
-    if outlier_flag:
-        df = remove_outliers(df, numeric_cols)
-    
-    # Separate the features and target.
-    X = df.drop(columns=[target_column])
-    y = df[target_column]
-    
-    # Perform train/test split.
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    return X_train, X_test, y_train, y_test
+def train_linear_regression(X_train, y_train):
+    """
+    Train a Linear Regression model.
+    """
+    model = LinearRegression()
+    model.fit(X_train, y_train)
+    return model
 
-def build_stacked_model(preprocessor):
+def train_random_forest_classifier(X_train, y_train):
     """
-    Build and return a pipeline with a given preprocessor and a stacked regressor.
-    The stacked model combines RandomForest and XGBoost, with a Ridge regressor for blending.
+    Train a Random Forest classifier with default hyperparameters.
     """
-    # Define base learners.
-    estimators = [
-        ('rf', RandomForestRegressor(random_state=42)),
-        ('xgb', xgb.XGBRegressor(random_state=42, objective='reg:squarederror'))
-    ]
+    model = RandomForestClassifier(random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+def tune_random_forest_classifier(X_train, y_train):
+    """
+    Tune a Random Forest classifier using GridSearchCV.
     
-    # Define the final estimator using Ridge regression.
-    stacked_regressor = StackingRegressor(
-        estimators=estimators,
-        final_estimator=Ridge(),
-        cv=5,
-        n_jobs=-1
-    )
+    Returns the best estimator after hyperparameter search.
+    """
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20],
+        'min_samples_split': [2, 5, 10]
+    }
+    grid = GridSearchCV(RandomForestClassifier(random_state=42), param_grid, cv=5, n_jobs=-1)
+    grid.fit(X_train, y_train)
+    print("Best parameters (Classifier):", grid.best_params_)
+    return grid.best_estimator_
+
+def train_svc_classifier(X_train, y_train):
+    """
+    Train a Support Vector Classifier.
+    """
+    model = SVC(random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+def train_random_forest_regressor(X_train, y_train):
+    """
+    Train a Random Forest regressor.
+    """
+    model = RandomForestRegressor(random_state=42)
+    model.fit(X_train, y_train)
+    return model
+
+def tune_random_forest_regressor(X_train, y_train):
+    """
+    Tune a Random Forest regressor using GridSearchCV.
     
-    # Build the pipeline with the preprocessor and stacked regressor.
-    model_pipeline = Pipeline(steps=[
-        ('preprocessor', preprocessor),
-        ('stacked_model', stacked_regressor)
-    ])
+    Returns the best estimator.
+    """
+    param_grid = {
+        'n_estimators': [50, 100, 200],
+        'max_depth': [None, 10, 20],
+        'min_samples_split': [2, 5, 10]
+    }
+    grid = GridSearchCV(RandomForestRegressor(random_state=42), param_grid, cv=5, n_jobs=-1)
+    grid.fit(X_train, y_train)
+    print("Best parameters (Regressor):", grid.best_params_)
+    return grid.best_estimator_
+
+def train_svr(X_train, y_train):
+    """
+    Train a Support Vector Regressor.
+    """
+    model = SVR()
+    model.fit(X_train, y_train)
+    return model
+
+def tune_svr(X_train, y_train):
+    """
+    Tune a Support Vector Regressor using GridSearchCV.
     
-    return model_pipeline
+    Returns the best estimator.
+    """
+    param_grid = {
+        'C': [0.1, 1, 10],
+        'epsilon': [0.01, 0.1, 1],
+        'kernel': ['linear', 'rbf']
+    }
+    grid = GridSearchCV(SVR(), param_grid, cv=5, n_jobs=-1)
+    grid.fit(X_train, y_train)
+    print("Best parameters (SVR):", grid.best_params_)
+    return grid.best_estimator_
+
+def train_xgboost_classifier(X_train, y_train, params=None):
+    """
+    Train an XGBoost classifier on the provided data.
+
+    Parameters:
+        X_train : array-like
+            Training features.
+        y_train : array-like
+            Training labels.
+        params : dict, optional
+            Parameters for XGBClassifier. If None, default parameters are used.
+
+    Returns:
+        model : XGBClassifier
+            The trained XGBoost classifier.
+    """
+    if params is None:
+        params = {}
+    model = XGBClassifier(**params)
+    model.fit(X_train, y_train)
+    return model
+
+def train_xgboost_regressor(X_train, y_train, params=None):
+    """
+    Train an XGBoost regressor on the provided data.
+
+    Parameters:
+        X_train : array-like
+            Training features.
+        y_train : array-like
+            Training targets.
+        params : dict, optional
+            Parameters for XGBRegressor. If None, default parameters are used.
+
+    Returns:
+        model : XGBRegressor
+            The trained XGBoost regressor.
+    """
+    if params is None:
+        params = {}
+    model = XGBRegressor(**params)
+    model.fit(X_train, y_train)
+    return model
